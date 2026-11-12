@@ -203,16 +203,20 @@ public final class SqlParser {
         if (!DATE.matcher(value).matches()) {
             throw new IllegalArgumentException("ожидалась дата в формате ГГГГ-ММ-ДД");
         }
+        try {
+            return newDateFormat().parse(value);
+        } catch (ParseException exception) {
+            throw new IllegalArgumentException("некорректная дата " + value);
+        }
+    }
+
+    static SimpleDateFormat newDateFormat() {
         GregorianCalendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT);
         calendar.setGregorianChange(new Date(Long.MIN_VALUE));
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT);
         format.setCalendar(calendar);
         format.setLenient(false);
-        try {
-            return format.parse(value);
-        } catch (ParseException exception) {
-            throw new IllegalArgumentException("некорректная дата " + value);
-        }
+        return format;
     }
 
     private Table readTable() {
@@ -315,6 +319,12 @@ public final class SqlParser {
                 throw error(start, "некорректная запись числа");
             }
             offset = number.end();
+            if (offset < query.length()) {
+                char next = query.charAt(offset);
+                if (isNameStart(next) || next == '.') {
+                    throw error(start, "некорректная запись числа");
+                }
+            }
             token = new Token(Kind.NUMBER, number.group(), start);
         } else if ("(),*;=<>!".indexOf(current) >= 0) {
             offset++;

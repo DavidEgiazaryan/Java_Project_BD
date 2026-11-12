@@ -3,9 +3,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 
 public class Main {
     private static final String DATABASE_FILE = "database.ser";
@@ -32,15 +29,16 @@ public class Main {
                 System.out.println("Загружена база: " + path);
             }
 
-            if (args.length == 1 && isEmpty(database)) {
-                runDemo(database, storage);
+            SqlConsole console = new SqlConsole(database, storage);
+            if (args.length == 0) {
+                console.run();
+            } else if (isEmpty(database)) {
+                runDemo(console);
             } else {
-                if (args.length == 1) {
-                    System.out.println("Демонстрация с записью доступна для пустой базы.");
-                }
+                System.out.println("Демонстрация с записью доступна для пустой базы.");
                 for (Table table : database.getTables()) {
                     System.out.println("Таблица: " + table.getName());
-                    printRows(table, table.getRows());
+                    console.execute("SELECT * FROM " + table.getName() + ";");
                 }
             }
         } catch (IOException error) {
@@ -71,34 +69,16 @@ public class Main {
         return true;
     }
 
-    private static void runDemo(Database database, DatabaseFile storage) throws IOException {
-        database.insert("brands", new Row(Arrays.<Object>asList(1, "Toyota")));
-        storage.save(database);
-        database.insert("cars", new Row(Arrays.<Object>asList(
-                1, 1, "Camry", 25000.0, new Date(0), true)));
-        storage.save(database);
-
-        Map<String, Object> corolla = new HashMap<String, Object>();
-        corolla.put("id", 2);
-        corolla.put("brand_id", 1);
-        corolla.put("model", "Corolla");
-        database.insert("cars", corolla);
-        storage.save(database);
-
-        Condition corollaId = new Condition("id", Condition.Operator.EQUAL, 2);
-        int updated = database.update("cars", "price", 30000, corollaId);
-        storage.save(database);
-        System.out.println("Обновлено записей: " + updated);
-        Condition expensive = new Condition("price", Condition.Operator.GREATER, 20000);
+    private static void runDemo(SqlConsole console) throws IOException {
+        console.execute("INSERT INTO brands VALUES (1, 'Toyota');");
+        console.execute("INSERT INTO cars VALUES (1, 1, 'Camry', 25000.0, '2024-05-17', TRUE);");
+        console.execute("INSERT INTO cars (id, brand_id, model) VALUES (2, 1, 'Corolla');");
+        console.execute("UPDATE cars SET price = 30000 WHERE id = 2;");
         System.out.println("Автомобили дороже 20000:");
-        printRows(database.getTable("cars"), database.select("cars", expensive));
-
-        Condition camryId = new Condition("id", Condition.Operator.EQUAL, 1);
-        int deleted = database.delete("cars", camryId);
-        storage.save(database);
-        System.out.println("Удалено записей: " + deleted);
+        console.execute("SELECT * FROM cars WHERE price > 20000;");
+        console.execute("DELETE FROM cars WHERE id = 1;");
         System.out.println("Автомобили после удаления:");
-        printRows(database.getTable("cars"), database.select("cars", null));
+        console.execute("SELECT * FROM cars;");
     }
 
     static Database createEmptyDatabase() {
@@ -117,19 +97,5 @@ public class Main {
         ), Collections.<Row>emptyList());
 
         return new Database(Arrays.asList(brands, cars));
-    }
-
-    private static void printRows(Table table, Iterable<Row> rows) {
-        for (Column column : table.getColumns()) {
-            System.out.print(column.getName() + "\t");
-        }
-        System.out.println();
-        for (Row row : rows) {
-            for (Object value : row.getValues()) {
-                System.out.print(value + "\t");
-            }
-            System.out.println();
-        }
-        System.out.println();
     }
 }
